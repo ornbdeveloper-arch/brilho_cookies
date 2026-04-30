@@ -4,6 +4,10 @@ function renderLayout(activePage) {
   const main = document.getElementById("main-content");
   const mainHTML = main ? main.innerHTML : "";
 
+
+  /* 
+  Estrutura da Sidebar e seus itens editáveis
+  */
   root.innerHTML = `
     <aside class="sidebar">
       <div class="brand">

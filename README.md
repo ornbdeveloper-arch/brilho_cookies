@@ -1,4 +1,4 @@
-# 🍪 CookieJar — Versão HTML/CSS/JS puros
+# 🍪 Brilho Cookies
 
 Aplicação local para gestão de venda de cookies, sem frameworks ou build.
 
@@ -20,7 +20,7 @@ Acesse `http://localhost:8080`.
 ## Estrutura
 
 ```
-cookiejar/
+raffa/
 ├── index.html       # Dashboard
 ├── cookies.html     # Cadastro e estoque de cookies
 ├── clientes.html    # Cadastro de clientes (CPF, contato)

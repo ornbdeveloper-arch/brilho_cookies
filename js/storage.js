@@ -1,4 +1,4 @@
-/* 🍪 CookieJar — Camada de persistência em localStorage
+/* 🍪 Brilho Cookies — Camada de persistência em localStorage
    Mantém cookies, clientes e vendas. Tudo síncrono e local. */
 
 const KEYS = {
