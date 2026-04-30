@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brilho Cookies — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="app" class="app">
+    <main id="main-content">
+      <div class="page-header">
+        <div>
+          <h1>Olá, Raffa 🍪</h1>
+          <p class="subtitle">Resumo da sua confeitaria de cantinho.</p>
+        </div>
+        <a href="vendas.html" class="btn">+ Nova venda</a>
+      </div>
+
+      <div class="grid cols-4" id="stats"></div>
+
+      <div class="grid cols-2" style="margin-top: 24px;">
+        <div class="card">
+          <h3>🔥 Vendas recentes</h3>
+          <p class="muted">Últimas 5 vendas registradas.</p>
+          <div id="recent-sales" style="margin-top: 12px;"></div>
+        </div>
+        <div class="card">
+          <h3>⚠️ Estoque baixo</h3>
+          <p class="muted">Cookies com menos de 10 unidades.</p>
+          <div id="low-stock" style="margin-top: 12px;"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/storage.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/layout.js"></script>
+  <script>
+    renderLayout("dashboard");
+
+    const cookies = cookieStore.list();
+    const customers = customerStore.list();
+    const sales = saleStore.list();
+    const pendingSales = sales.filter((s) => s.paymentStatus === "pending");
+    const totalRevenue = sales.filter((s) => s.paymentStatus === "paid").reduce((sum, s) => sum + s.total, 0);
+    const totalPending = pendingSales.reduce((sum, s) => sum + s.total, 0);
+
+    const stats = [
+      { label: "Tipos de cookie", value: cookies.length, hint: "cadastrados" },
+      { label: "Clientes", value: customers.length, hint: "fidelizando" },
+      { label: "Receita paga", value: fmt.brl(totalRevenue), hint: `${sales.length} vendas` },
+      { label: "A receber", value: fmt.brl(totalPending), hint: `${pendingSales.length} pendentes` },
+    ];
+    document.getElementById("stats").innerHTML = stats.map((s) => `
+      <div class="stat">
+        <div class="stat-label">${s.label}</div>
+        <div class="stat-value">${s.value}</div>
+        <div class="stat-hint">${s.hint}</div>
+      </div>`).join("");
+
+    // Recent sales
+    const recent = [...sales].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
+    const recentEl = document.getElementById("recent-sales");
+    if (!recent.length) {
+      recentEl.innerHTML = `<p class="muted">Nenhuma venda ainda. Comece registrando uma! 🛍️</p>`;
+    } else {
+      recentEl.innerHTML = `<div class="table-wrap"><table>
+        <thead><tr><th>Cliente</th><th>Total</th><th>Status</th></tr></thead>
+        <tbody>${recent.map((s) => `
+          <tr>
+            <td>${s.customerName}</td>
+            <td>${fmt.brl(s.total)}</td>
+            <td>${s.paymentStatus === "paid"
+              ? '<span class="badge success">Pago</span>'
+              : '<span class="badge pending">Pendente</span>'}</td>
+          </tr>`).join("")}
+        </tbody></table></div>`;
+    }
+
+    // Low stock
+    const low = cookies.filter((c) => c.stock < 10).sort((a, b) => a.stock - b.stock);
+    const lowEl = document.getElementById("low-stock");
+    if (!cookies.length) {
+      lowEl.innerHTML = `<p class="muted">Cadastre seus cookies em <a href="cookies.html" style="color:var(--primary);font-weight:700;">Cookies</a>.</p>`;
+    } else if (!low.length) {
+      lowEl.innerHTML = `<p class="muted">Tudo em ordem por aqui! ✨</p>`;
+    } else {
+      lowEl.innerHTML = low.map((c) => `
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+          <span>${c.name}</span>
+          <span class="badge ${c.stock === 0 ? "danger" : "pending"}">${c.stock} un.</span>
+        </div>`).join("");
+    }
+  </script>
+</body>
+</html>

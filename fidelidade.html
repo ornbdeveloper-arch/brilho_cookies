@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brilho Cookies — Fidelidade</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="app" class="app">
+    <main id="main-content">
+      <div class="page-header">
+        <div>
+          <h1>Fidelidade 💖</h1>
+          <p class="subtitle">Ranking dos CPFs que mais compram. Bronze 🥉 | Prata 🥈 | Ouro 🥇</p>
+        </div>
+      </div>
+
+      <div class="grid cols-3" id="tier-stats" style="margin-bottom:24px;"></div>
+      <div id="ranking"></div>
+    </main>
+  </div>
+
+  <script src="js/storage.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/layout.js"></script>
+  <script>
+    renderLayout("fidelidade");
+
+    /** Calcula tier por valor total comprado.
+     * Bronze: < R$ 100 | Prata: R$ 100–299 | Ouro: ≥ R$ 300 */
+    function tierOf(total) {
+      if (total >= 300) return { name: "Ouro", emoji: "🥇", badge: "gold" };
+      if (total >= 100) return { name: "Prata", emoji: "🥈", badge: "silver" };
+      return { name: "Bronze", emoji: "🥉", badge: "bronze" };
+    }
+
+    const sales = saleStore.list();
+    /* Agrupa por CPF */
+    const groups = {};
+    sales.forEach((s) => {
+      if (!groups[s.customerCpf]) groups[s.customerCpf] = {
+        cpf: s.customerCpf, name: s.customerName, salesCount: 0, totalSpent: 0, lastPurchase: null,
+      };
+      const g = groups[s.customerCpf];
+      g.salesCount++;
+      g.totalSpent += s.total;
+      if (!g.lastPurchase || new Date(s.createdAt) > new Date(g.lastPurchase)) g.lastPurchase = s.createdAt;
+    });
+    const ranking = Object.values(groups)
+      .map((g) => ({ ...g, tier: tierOf(g.totalSpent) }))
+      .sort((a, b) => b.totalSpent - a.totalSpent);
+
+    const counts = { Ouro: 0, Prata: 0, Bronze: 0 };
+    ranking.forEach((r) => counts[r.tier.name]++);
+
+    document.getElementById("tier-stats").innerHTML = `
+      <div class="stat"><div class="stat-label">🥇 Ouro</div><div class="stat-value">${counts.Ouro}</div><div class="stat-hint">≥ R$ 300 em compras</div></div>
+      <div class="stat"><div class="stat-label">🥈 Prata</div><div class="stat-value">${counts.Prata}</div><div class="stat-hint">R$ 100 – R$ 299</div></div>
+      <div class="stat"><div class="stat-label">🥉 Bronze</div><div class="stat-value">${counts.Bronze}</div><div class="stat-hint">Até R$ 99</div></div>`;
+
+    const rankEl = document.getElementById("ranking");
+    if (!ranking.length) {
+      rankEl.innerHTML = `<div class="empty">
+        <div class="emoji">💖</div>
+        <h3>Sem vendas registradas ainda</h3>
+        <p>Conforme registrar vendas, o ranking dos clientes mais fiéis aparece aqui.</p>
+      </div>`;
+    } else {
+      rankEl.innerHTML = `<div class="table-wrap"><table>
+        <thead><tr><th>#</th><th>Cliente</th><th>CPF</th><th>Compras</th><th>Total gasto</th><th>Última</th><th>Tier</th></tr></thead>
+        <tbody>${ranking.map((r, i) => `
+          <tr>
+            <td><strong>${i + 1}º</strong></td>
+            <td>${r.name}</td>
+            <td>${fmt.cpf(r.cpf)}</td>
+            <td>${r.salesCount}</td>
+            <td><strong>${fmt.brl(r.totalSpent)}</strong></td>
+            <td>${fmt.date(r.lastPurchase)}</td>
+            <td><span class="badge ${r.tier.badge}">${r.tier.emoji} ${r.tier.name}</span></td>
+          </tr>`).join("")}
+        </tbody></table></div>`;
+    }
+  </script>
+</body>
+</html>

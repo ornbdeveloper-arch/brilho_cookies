@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brilho Cookies — Vendas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="app" class="app">
+    <main id="main-content">
+      <div class="page-header">
+        <div>
+          <h1>Vendas 🛍️</h1>
+          <p class="subtitle">Toda venda nasce <strong>pendente</strong>. Marque como paga quando o dinheiro cair.</p>
+        </div>
+        <button class="btn" id="btn-new">+ Registrar venda</button>
+      </div>
+
+      <div class="filters">
+        <input id="f-text" placeholder="🔍 Cliente ou CPF..." />
+        <select id="f-status">
+          <option value="all">Todos os pagamentos</option>
+          <option value="pending">Pendentes</option>
+          <option value="paid">Pagas</option>
+        </select>
+        <select id="f-method">
+          <option value="all">Todos os métodos</option>
+          <option value="pix">Pix</option>
+          <option value="dinheiro">Dinheiro</option>
+          <option value="cartao">Cartão</option>
+          <option value="fiado">Fiado</option>
+        </select>
+      </div>
+
+      <div id="sale-list"></div>
+    </main>
+  </div>
+
+  <script src="js/storage.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/layout.js"></script>
+  <script>
+    renderLayout("vendas");
+    const listEl = document.getElementById("sale-list");
+    const methodLabel = { pix: "Pix", dinheiro: "Dinheiro", cartao: "Cartão", fiado: "Fiado" };
+
+    function render() {
+      let sales = saleStore.list().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const term = document.getElementById("f-text").value.toLowerCase().trim();
+      const status = document.getElementById("f-status").value;
+      const method = document.getElementById("f-method").value;
+      if (term) sales = sales.filter((s) =>
+        s.customerName.toLowerCase().includes(term) || s.customerCpf.includes(term));
+      if (status !== "all") sales = sales.filter((s) => s.paymentStatus === status);
+      if (method !== "all") sales = sales.filter((s) => s.paymentMethod === method);
+
+      if (!sales.length) {
+        listEl.innerHTML = `<div class="empty">
+          <div class="emoji">🛍️</div>
+          <h3>Nenhuma venda encontrada</h3>
+          <p>Registre sua primeira venda no botão acima.</p>
+        </div>`;
+        return;
+      }
+
+      listEl.innerHTML = `<div class="table-wrap"><table>
+        <thead><tr><th>Data</th><th>Cliente</th><th>Itens</th><th>Total</th><th>Método</th><th>Status</th><th></th></tr></thead>
+        <tbody>${sales.map((s) => `
+          <tr>
+            <td>${fmt.date(s.createdAt)}</td>
+            <td><strong>${s.customerName}</strong><br/><span style="font-size:0.78rem;color:var(--muted-foreground);">${fmt.cpf(s.customerCpf)}</span></td>
+            <td>${s.items.reduce((n, i) => n + i.quantity, 0)} un.</td>
+            <td><strong>${fmt.brl(s.total)}</strong></td>
+            <td><span class="badge info">${methodLabel[s.paymentMethod] || s.paymentMethod}</span></td>
+            <td>${s.paymentStatus === "paid"
+              ? '<span class="badge success">Pago</span>'
+              : '<span class="badge pending">Pendente</span>'}</td>
+            <td style="text-align:right;white-space:nowrap;">
+              <button class="btn ghost sm" data-view="${s.id}">👁️</button>
+              ${s.paymentStatus === "paid"
+                ? `<button class="btn secondary sm" data-unpay="${s.id}">↺</button>`
+                : `<button class="btn sm" data-pay="${s.id}">✓ Pagar</button>`}
+              <button class="btn ghost sm" data-del="${s.id}">🗑️</button>
+            </td>
+          </tr>`).join("")}</tbody></table></div>`;
+
+      listEl.querySelectorAll("[data-pay]").forEach((b) =>
+        b.onclick = () => { saleStore.markPaid(b.dataset.pay); toast("Venda marcada como paga! 💰", "success"); render(); });
+      listEl.querySelectorAll("[data-unpay]").forEach((b) =>
+        b.onclick = () => { saleStore.markPending(b.dataset.unpay); toast("Venda marcada como pendente", "info"); render(); });
+      listEl.querySelectorAll("[data-view]").forEach((b) =>
+        b.onclick = () => viewSale(saleStore.get(b.dataset.view)));
+      listEl.querySelectorAll("[data-del]").forEach((b) =>
+        b.onclick = async () => {
+          const ok = await confirmModal({ title: "Excluir venda?", message: "O estoque dos cookies será devolvido." });
+          if (ok) { saleStore.remove(b.dataset.del); toast("Venda removida", "success"); render(); }
+        });
+    }
+
+    function viewSale(s) {
+      const html = `
+        <p><strong>Cliente:</strong> ${s.customerName} (${fmt.cpf(s.customerCpf)})</p>
+        <p><strong>Data:</strong> ${fmt.date(s.createdAt)}</p>
+        <p><strong>Pagamento:</strong> ${methodLabel[s.paymentMethod]} — ${s.paymentStatus === "paid" ? "Pago" : "Pendente"}</p>
+        ${s.notes ? `<p><strong>Obs:</strong> ${s.notes}</p>` : ""}
+        <div class="table-wrap" style="margin-top:12px;"><table>
+          <thead><tr><th>Cookie</th><th>Qtd</th><th>Unit.</th><th>Subtotal</th></tr></thead>
+          <tbody>${s.items.map((i) => `
+            <tr><td>${i.cookieName}</td><td>${i.quantity}</td><td>${fmt.brl(i.unitPrice)}</td><td>${fmt.brl(i.quantity * i.unitPrice)}</td></tr>`).join("")}
+          </tbody>
+        </table></div>
+        <p style="text-align:right;margin-top:12px;font-size:1.1rem;"><strong>Total: ${fmt.brl(s.total)}</strong></p>`;
+      openModal({ title: "Detalhes da venda", body: html, confirmText: "Fechar", cancelText: "" });
+    }
+
+    function openSaleForm() {
+      const cookies = cookieStore.list().filter((c) => c.stock > 0);
+      const customers = customerStore.list();
+      if (!cookies.length) { toast("Cadastre cookies com estoque primeiro", "error"); return; }
+      if (!customers.length) { toast("Cadastre um cliente primeiro", "error"); return; }
+
+      const form = document.createElement("div");
+      form.innerHTML = `
+        <div class="field">
+          <label>Cliente *</label>
+          <select id="f-customer">
+            <option value="">Selecione...</option>
+            ${customers.map((c) => `<option value="${c.id}">${c.name} — ${fmt.cpf(c.cpf)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label>Cookies *</label>
+          <div id="items"></div>
+          <button class="btn ghost sm" id="add-item" type="button">+ Adicionar cookie</button>
+        </div>
+        <div class="form-row">
+          <div class="field"><label>Forma de pagamento *</label>
+            <select id="f-method">
+              <option value="pix">Pix</option>
+              <option value="dinheiro">Dinheiro</option>
+              <option value="cartao">Cartão</option>
+              <option value="fiado">Fiado (pagar depois)</option>
+            </select>
+          </div>
+          <div class="field"><label>Total</label><input id="f-total" disabled value="R$ 0,00" /></div>
+        </div>
+        <div class="field"><label>Observações</label><textarea id="f-notes" rows="2" placeholder="Ex: combinou pagar no dia 5"></textarea></div>
+        <p class="hint" style="background:var(--vanilla);padding:10px;border-radius:10px;color:var(--cocoa);">
+          💡 Toda venda é registrada como <strong>pendente</strong>. Marque como paga quando receber.
+        </p>`;
+
+      const items = [{ cookieId: "", quantity: 1 }];
+      const itemsEl = form.querySelector("#items");
+
+      function calcTotal() {
+        const total = items.reduce((sum, it) => {
+          const c = cookies.find((x) => x.id === it.cookieId);
+          return sum + (c ? c.price * (Number(it.quantity) || 0) : 0);
+        }, 0);
+        form.querySelector("#f-total").value = fmt.brl(total);
+      }
+
+      function renderItems() {
+        itemsEl.innerHTML = items.map((it, i) => `
+          <div class="sale-cookie-row">
+            <select data-i="${i}" data-k="cookieId">
+              <option value="">Selecione...</option>
+              ${cookies.map((c) => `<option value="${c.id}" ${it.cookieId === c.id ? "selected" : ""}>${c.name} (${c.stock} un.) — ${fmt.brl(c.price)}</option>`).join("")}
+            </select>
+            <input type="number" min="1" data-i="${i}" data-k="quantity" value="${it.quantity}" />
+            <button class="btn ghost sm" data-rm="${i}" type="button">✕</button>
+          </div>`).join("");
+        itemsEl.querySelectorAll("select,input").forEach((el) => {
+          el.oninput = el.onchange = () => { items[+el.dataset.i][el.dataset.k] = el.value; calcTotal(); };
+        });
+        itemsEl.querySelectorAll("[data-rm]").forEach((b) =>
+          b.onclick = () => { items.splice(+b.dataset.rm, 1); renderItems(); calcTotal(); });
+      }
+      renderItems();
+
+      form.querySelector("#add-item").onclick = () => { items.push({ cookieId: "", quantity: 1 }); renderItems(); };
+
+      openModal({
+        title: "Registrar venda",
+        body: form,
+        confirmText: "Registrar",
+        onConfirm: () => {
+          const customerId = form.querySelector("#f-customer").value;
+          const customer = customerStore.get(customerId);
+          if (!customer) { toast("Selecione um cliente", "error"); return false; }
+          const validItems = items.filter((i) => i.cookieId && Number(i.quantity) > 0);
+          if (!validItems.length) { toast("Adicione ao menos um cookie", "error"); return false; }
+          for (const it of validItems) {
+            const c = cookies.find((x) => x.id === it.cookieId);
+            if (!c) { toast("Cookie inválido", "error"); return false; }
+            if (Number(it.quantity) > c.stock) { toast(`Estoque insuficiente para ${c.name}`, "error"); return false; }
+          }
+          const method = form.querySelector("#f-method").value;
+          saleStore.create({
+            customerId: customer.id,
+            customerName: customer.name,
+            customerCpf: customer.cpf,
+            items: validItems.map((it) => {
+              const c = cookies.find((x) => x.id === it.cookieId);
+              return { cookieId: c.id, cookieName: c.name, quantity: Number(it.quantity), unitPrice: c.price };
+            }),
+            paymentMethod: method,
+            payLater: method === "fiado",
+            notes: form.querySelector("#f-notes").value.trim(),
+          });
+          toast("Venda registrada! 🎉", "success");
+          render();
+        },
+      });
+    }
+
+    document.getElementById("btn-new").onclick = openSaleForm;
+    ["f-text", "f-status", "f-method"].forEach((id) => {
+      document.getElementById(id).oninput = render;
+      document.getElementById(id).onchange = render;
+    });
+    render();
+  </script>
+</body>
+</html>

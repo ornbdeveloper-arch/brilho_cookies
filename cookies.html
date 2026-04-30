@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brilho Cookies — Cookies</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="app" class="app">
+    <main id="main-content">
+      <div class="page-header">
+        <div>
+          <h1>Cookies 🍪</h1>
+          <p class="subtitle">Cadastre os tipos, controle estoque e ingredientes.</p>
+        </div>
+        <button class="btn" id="btn-new">+ Novo cookie</button>
+      </div>
+
+      <div class="filters">
+        <input id="filter-name" type="text" placeholder="🔍 Buscar por nome ou sabor..." />
+        <select id="filter-stock">
+          <option value="all">Todos os estoques</option>
+          <option value="low">Estoque baixo (&lt;10)</option>
+          <option value="zero">Sem estoque</option>
+          <option value="ok">Em estoque</option>
+        </select>
+      </div>
+
+      <div id="cookie-list"></div>
+    </main>
+  </div>
+
+  <script src="js/storage.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/layout.js"></script>
+  <script>
+    renderLayout("cookies");
+    const listEl = document.getElementById("cookie-list");
+
+    function render() {
+      let cookies = cookieStore.list();
+      const term = document.getElementById("filter-name").value.toLowerCase().trim();
+      const stockF = document.getElementById("filter-stock").value;
+      if (term) cookies = cookies.filter((c) =>
+        c.name.toLowerCase().includes(term) || (c.flavor || "").toLowerCase().includes(term));
+      if (stockF === "low") cookies = cookies.filter((c) => c.stock > 0 && c.stock < 10);
+      if (stockF === "zero") cookies = cookies.filter((c) => c.stock === 0);
+      if (stockF === "ok") cookies = cookies.filter((c) => c.stock >= 10);
+
+      if (!cookies.length) {
+        listEl.innerHTML = `<div class="empty">
+          <div class="emoji">🍪</div>
+          <h3>Nenhum cookie por aqui</h3>
+          <p>Comece cadastrando seu primeiro tipo de cookie.</p>
+        </div>`;
+        return;
+      }
+      listEl.innerHTML = `<div class="grid cols-3">${cookies.map(cookieCard).join("")}</div>`;
+      listEl.querySelectorAll("[data-edit]").forEach((b) =>
+        b.onclick = () => openCookieForm(cookieStore.get(b.dataset.edit)));
+      listEl.querySelectorAll("[data-del]").forEach((b) =>
+        b.onclick = async () => {
+          const ok = await confirmModal({ title: "Excluir cookie?", message: "Esta ação não pode ser desfeita." });
+          if (ok) { cookieStore.remove(b.dataset.del); toast("Cookie removido", "success"); render(); }
+        });
+    }
+
+    function cookieCard(c) {
+      const stockBadge = c.stock === 0
+        ? `<span class="badge danger">Sem estoque</span>`
+        : c.stock < 10
+          ? `<span class="badge pending">${c.stock} un.</span>`
+          : `<span class="badge success">${c.stock} un.</span>`;
+      const ings = (c.ingredients || []).map((i) =>
+        `<li style="font-size:0.82rem;color:var(--muted-foreground);">• ${i.name} — ${i.amount} ${i.unit}</li>`).join("");
+      return `<div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <div>
+            <h3>${c.name}</h3>
+            ${c.flavor ? `<p class="muted">${c.flavor}</p>` : ""}
+          </div>
+          ${stockBadge}
+        </div>
+        <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;">
+          <strong style="color:var(--cocoa);font-size:1.1rem;">${fmt.brl(c.price)}</strong>
+        </div>
+        ${ings ? `<details style="margin-top:10px;"><summary style="cursor:pointer;font-size:0.85rem;font-weight:700;color:var(--primary);">Ingredientes</summary><ul style="margin:8px 0 0;padding-left:0;list-style:none;">${ings}</ul></details>` : ""}
+        <div style="display:flex;gap:8px;margin-top:14px;">
+          <button class="btn secondary sm" data-edit="${c.id}">✏️ Editar</button>
+          <button class="btn ghost sm" data-del="${c.id}">🗑️ Excluir</button>
+        </div>
+      </div>`;
+    }
+
+    function openCookieForm(cookie) {
+      const isEdit = !!cookie;
+      const data = cookie || { name: "", flavor: "", price: 0, stock: 0, ingredients: [] };
+      const form = document.createElement("div");
+      form.innerHTML = `
+        <div class="form-row">
+          <div class="field"><label>Nome *</label><input id="f-name" value="${data.name}" required /></div>
+          <div class="field"><label>Sabor</label><input id="f-flavor" value="${data.flavor}" placeholder="Chocolate, baunilha..." /></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label>Preço (R$) *</label><input id="f-price" type="number" step="0.01" min="0" value="${data.price}" /></div>
+          <div class="field"><label>Estoque (un.) *</label><input id="f-stock" type="number" min="0" value="${data.stock}" /></div>
+        </div>
+        <div class="field">
+          <label>Ingredientes</label>
+          <div id="ings"></div>
+          <button class="btn ghost sm" id="add-ing" type="button">+ Adicionar ingrediente</button>
+        </div>`;
+      const ingsEl = form.querySelector("#ings");
+      const ingsState = [...(data.ingredients || [])];
+
+      function renderIngs() {
+        ingsEl.innerHTML = ingsState.map((ing, i) => `
+          <div class="ing-row">
+            <input placeholder="Ingrediente" data-i="${i}" data-k="name" value="${ing.name || ""}" />
+            <input type="number" step="0.01" min="0" placeholder="Qtd" data-i="${i}" data-k="amount" value="${ing.amount || ""}" />
+            <select data-i="${i}" data-k="unit">
+              ${["g","kg","ml","l","un"].map((u) => `<option ${ing.unit === u ? "selected" : ""}>${u}</option>`).join("")}
+            </select>
+            <button class="btn ghost sm" data-rm="${i}" type="button">✕</button>
+          </div>`).join("");
+        ingsEl.querySelectorAll("input,select").forEach((el) => {
+          el.oninput = () => {
+            const i = +el.dataset.i;
+            ingsState[i][el.dataset.k] = el.value;
+          };
+        });
+        ingsEl.querySelectorAll("[data-rm]").forEach((b) =>
+          b.onclick = () => { ingsState.splice(+b.dataset.rm, 1); renderIngs(); });
+      }
+      renderIngs();
+      form.querySelector("#add-ing").onclick = () => { ingsState.push({ name: "", amount: 0, unit: "g" }); renderIngs(); };
+
+      openModal({
+        title: isEdit ? "Editar cookie" : "Novo cookie",
+        subtitle: "Preencha os detalhes do seu cookie. Ingredientes são opcionais.",
+        body: form,
+        confirmText: isEdit ? "Salvar" : "Cadastrar",
+        onConfirm: () => {
+          const payload = {
+            name: form.querySelector("#f-name").value.trim(),
+            flavor: form.querySelector("#f-flavor").value.trim(),
+            price: form.querySelector("#f-price").value,
+            stock: form.querySelector("#f-stock").value,
+            ingredients: ingsState.filter((i) => i.name && i.name.trim()),
+          };
+          if (!payload.name) { toast("O nome é obrigatório", "error"); return false; }
+          if (isEdit) { cookieStore.update(cookie.id, payload); toast("Cookie atualizado!", "success"); }
+          else { cookieStore.create(payload); toast("Cookie cadastrado!", "success"); }
+          render();
+        },
+      });
+    }
+
+    document.getElementById("btn-new").onclick = () => openCookieForm(null);
+    document.getElementById("filter-name").oninput = render;
+    document.getElementById("filter-stock").onchange = render;
+    render();
+  </script>
+</body>
+</html>
