@@ -54,7 +54,7 @@
       const status = document.getElementById("f-status").value;
       const method = document.getElementById("f-method").value;
       if (term) sales = sales.filter((s) =>
-        s.customerName.toLowerCase().includes(term) || s.customerCpf.includes(term));
+        s.customerName.toLowerCase().includes(term) || (s.customerCpf || "").includes(term));
       if (status !== "all") sales = sales.filter((s) => s.paymentStatus === status);
       if (method !== "all") sales = sales.filter((s) => s.paymentMethod === method);
 
@@ -129,7 +129,7 @@
           <label>Cliente *</label>
           <select id="f-customer">
             <option value="">Selecione...</option>
-            ${customers.map((c) => `<option value="${c.id}">${c.name} — ${fmt.cpf(c.cpf)}</option>`).join("")}
+            ${customers.map((c) => `<option value="${c.id}">${c.name}${c.cpf ? ` — ${fmt.cpf(c.cpf)}` : ""}</option>`).join("")}
           </select>
         </div>
         <div class="field">

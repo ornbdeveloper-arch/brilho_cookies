@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 from fastapi import HTTPException
@@ -13,11 +14,16 @@ load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 def get_supabase() -> Client:
     global _client
     if _client is None:
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_KEY")
+        url = (os.getenv("SUPABASE_URL") or "").strip()
+        key = (os.getenv("SUPABASE_KEY") or "").strip()
         if not url or not key:
             raise RuntimeError(
                 "Configure as variaveis de ambiente SUPABASE_URL e SUPABASE_KEY."
+            )
+        parsed = urlparse(url)
+        if parsed.path and parsed.path != "/":
+            raise RuntimeError(
+                "SUPABASE_URL deve ser apenas a URL base, sem caminho como /rest/v1."
             )
         _client = create_client(url, key)
     return _client
@@ -30,12 +36,15 @@ def criar_tabelas():
 
 
 def verificar_configuracao():
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_KEY")
+    url = (os.getenv("SUPABASE_URL") or "").strip()
+    key = (os.getenv("SUPABASE_KEY") or "").strip()
+    parsed = urlparse(url)
     status = {
         "api": "ok",
         "supabase_url_configurada": bool(url),
         "supabase_key_configurada": bool(key),
+        "supabase_url_host": parsed.netloc,
+        "supabase_url_path": parsed.path,
         "customers_acessivel": False,
     }
     if not url or not key:
@@ -184,9 +193,10 @@ def remover_cookie(cookie_id):
 
 
 def criar_cliente(data):
+    cpf = (data.get("cpf") or "").strip() or None
     payload = {
         "name": (data.get("name") or data.get("nome") or "").strip(),
-        "cpf": data.get("cpf", "").strip(),
+        "cpf": cpf,
         "contact": (data.get("contact") or data.get("telefone") or "").strip(),
     }
     result = _executar_supabase(
@@ -219,9 +229,10 @@ def obter_cliente(cliente_id):
 
 
 def atualizar_cliente(cliente_id, data):
+    cpf = (data.get("cpf") or "").strip() or None
     payload = {
         "name": (data.get("name") or data.get("nome") or "").strip(),
-        "cpf": data.get("cpf", "").strip(),
+        "cpf": cpf,
         "contact": (data.get("contact") or data.get("telefone") or "").strip(),
     }
     result = (
@@ -251,7 +262,7 @@ def criar_venda(data):
     payload = {
         "customer_id": data.get("customerId"),
         "customer_name": (data.get("customerName") or data.get("cliente") or "").strip(),
-        "customer_cpf": data.get("customerCpf", "").strip(),
+        "customer_cpf": (data.get("customerCpf") or "").strip() or None,
         "items": items,
         "total": total,
         "payment_method": data.get("paymentMethod", "pix"),

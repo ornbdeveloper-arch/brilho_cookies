@@ -15,7 +15,7 @@
       <div class="page-header">
         <div>
           <h1>Fidelidade 💖</h1>
-          <p class="subtitle">Ranking dos CPFs que mais compram. Bronze 🥉 | Prata 🥈 | Ouro 🥇</p>
+          <p class="subtitle">Ranking dos clientes que mais compram. Bronze 🥉 | Prata 🥈 | Ouro 🥇</p>
         </div>
       </div>
 
@@ -40,13 +40,14 @@
     }
 
     const sales = saleStore.list();
-    /* Agrupa por CPF */
+    /* Agrupa por cliente. Usa CPF quando existir, senão usa o ID da venda. */
     const groups = {};
     sales.forEach((s) => {
-      if (!groups[s.customerCpf]) groups[s.customerCpf] = {
+      const key = s.customerCpf || s.customerId || s.customerName;
+      if (!groups[key]) groups[key] = {
         cpf: s.customerCpf, name: s.customerName, salesCount: 0, totalSpent: 0, lastPurchase: null,
       };
-      const g = groups[s.customerCpf];
+      const g = groups[key];
       g.salesCount++;
       g.totalSpent += s.total;
       if (!g.lastPurchase || new Date(s.createdAt) > new Date(g.lastPurchase)) g.lastPurchase = s.createdAt;

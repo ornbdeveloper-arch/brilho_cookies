@@ -8,6 +8,7 @@ const fmt = {
     return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   },
   cpf: (cpf) => {
+    if (!cpf) return "—";
     const v = (cpf || "").replace(/\D/g, "").padStart(11, "0").slice(0, 11);
     return v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
   },

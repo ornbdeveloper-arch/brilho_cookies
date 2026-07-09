@@ -13,7 +13,7 @@ create table if not exists public.cookies (
 create table if not exists public.customers (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  cpf text not null unique,
+  cpf text unique,
   contact text not null default '',
   created_at timestamptz not null default now()
 );
@@ -22,7 +22,7 @@ create table if not exists public.sales (
   id uuid primary key default gen_random_uuid(),
   customer_id uuid references public.customers(id) on delete set null,
   customer_name text not null,
-  customer_cpf text not null,
+  customer_cpf text,
   items jsonb not null default '[]'::jsonb,
   total numeric(10, 2) not null default 0,
   payment_method text not null default 'pix',
@@ -36,6 +36,9 @@ create table if not exists public.sales (
 alter table public.cookies enable row level security;
 alter table public.customers enable row level security;
 alter table public.sales enable row level security;
+
+alter table public.customers alter column cpf drop not null;
+alter table public.sales alter column customer_cpf drop not null;
 
 drop policy if exists "Backend can manage cookies" on public.cookies;
 drop policy if exists "Backend can manage customers" on public.customers;

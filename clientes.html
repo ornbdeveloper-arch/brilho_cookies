@@ -15,7 +15,7 @@
       <div class="page-header">
         <div>
           <h1>Clientes 👥</h1>
-          <p class="subtitle">Cadastre quem comprar — usamos o CPF para o ranking de fidelidade.</p>
+          <p class="subtitle">Cadastre quem comprar. Nome é o único campo obrigatório.</p>
         </div>
         <button class="btn" id="btn-new">+ Novo cliente</button>
       </div>
@@ -41,7 +41,7 @@
       if (term) {
         customers = customers.filter((c) =>
           c.name.toLowerCase().includes(term) ||
-          c.cpf.includes(term) ||
+          (c.cpf || "").includes(term) ||
           (c.contact || "").toLowerCase().includes(term));
       }
       if (!customers.length) {
@@ -56,7 +56,7 @@
       listEl.innerHTML = `<div class="table-wrap"><table>
         <thead><tr><th>Nome</th><th>CPF</th><th>Contato</th><th>Compras</th><th></th></tr></thead>
         <tbody>${customers.map((c) => {
-          const cs = sales.filter((s) => s.customerCpf === c.cpf);
+          const cs = sales.filter((s) => s.customerId === c.id || (c.cpf && s.customerCpf === c.cpf));
           return `<tr>
             <td><strong>${c.name}</strong></td>
             <td>${fmt.cpf(c.cpf)}</td>
@@ -85,23 +85,23 @@
       form.innerHTML = `
         <div class="field"><label>Nome *</label><input id="f-name" value="${data.name}" required /></div>
         <div class="form-row">
-          <div class="field"><label>CPF *</label><input id="f-cpf" value="${data.cpf}" placeholder="000.000.000-00" maxlength="14" /></div>
+          <div class="field"><label>CPF</label><input id="f-cpf" value="${data.cpf}" placeholder="000.000.000-00" maxlength="14" /></div>
           <div class="field"><label>Contato</label><input id="f-contact" value="${data.contact}" placeholder="WhatsApp, email..." /></div>
         </div>`;
       maskCpf(form.querySelector("#f-cpf"));
 
       openModal({
         title: isEdit ? "Editar cliente" : "Novo cliente",
-        subtitle: "O CPF é usado como chave única para o ranking de fidelidade.",
+        subtitle: "Apenas o nome é obrigatório. CPF e contato são opcionais.",
         body: form,
         confirmText: isEdit ? "Salvar" : "Cadastrar",
         onConfirm: async () => {
           const name = form.querySelector("#f-name").value.trim();
           const cpf = form.querySelector("#f-cpf").value.trim();
           const contact = form.querySelector("#f-contact").value.trim();
-          if (!name || !cpf) { toast("Nome e CPF são obrigatórios", "error"); return false; }
-          if (cpf.replace(/\D/g, "").length !== 11) { toast("CPF inválido", "error"); return false; }
-          const exists = customerStore.getByCpf(cpf);
+          if (!name) { toast("Nome é obrigatório", "error"); return false; }
+          if (cpf && cpf.replace(/\D/g, "").length !== 11) { toast("CPF inválido", "error"); return false; }
+          const exists = cpf ? customerStore.getByCpf(cpf) : null;
           if (exists && (!isEdit || exists.id !== customer.id)) { toast("CPF já cadastrado", "error"); return false; }
           if (isEdit) await customerStore.update(customer.id, { name, cpf, contact });
           else await customerStore.create({ name, cpf, contact });
