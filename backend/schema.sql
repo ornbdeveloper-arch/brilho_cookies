@@ -37,6 +37,10 @@ alter table public.cookies enable row level security;
 alter table public.customers enable row level security;
 alter table public.sales enable row level security;
 
+drop policy if exists "Backend can manage cookies" on public.cookies;
+drop policy if exists "Backend can manage customers" on public.customers;
+drop policy if exists "Backend can manage sales" on public.sales;
+
 create policy "Backend can manage cookies"
 on public.cookies
 for all

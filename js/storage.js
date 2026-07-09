@@ -16,7 +16,14 @@ async function request(path, options = {}) {
   });
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || `Erro na API: ${response.status}`);
+    let message = text;
+    try {
+      const body = JSON.parse(text);
+      message = body.detail || body.erro || text;
+    } catch (_) {
+      message = text;
+    }
+    throw new Error(message || `Erro na API: ${response.status}`);
   }
   if (response.status === 204) return null;
   return response.json();

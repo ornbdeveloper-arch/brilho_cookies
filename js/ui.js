@@ -73,7 +73,7 @@ function openModal({ title, subtitle, body, onConfirm, confirmText = "Salvar", c
       if (ok !== false) close();
     } catch (error) {
       console.error(error);
-      toast("Nao foi possivel salvar. Confira os dados e tente novamente.", "error");
+      toast(error.message || "Nao foi possivel salvar. Confira os dados e tente novamente.", "error");
     } finally {
       button.disabled = false;
     }

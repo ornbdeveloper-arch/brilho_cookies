@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timezone
 
 from dotenv import load_dotenv
+from fastapi import HTTPException
 from supabase import Client, create_client
 
 
@@ -26,6 +27,35 @@ def criar_tabelas():
     # As tabelas ficam descritas em backend/schema.sql.
     # O Supabase nao permite criar schema pela API REST usada pela aplicacao.
     get_supabase()
+
+
+def verificar_configuracao():
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_KEY")
+    status = {
+        "api": "ok",
+        "supabase_url_configurada": bool(url),
+        "supabase_key_configurada": bool(key),
+        "customers_acessivel": False,
+    }
+    if not url or not key:
+        status["erro"] = "Configure SUPABASE_URL e SUPABASE_KEY no Render."
+        return status
+    try:
+        get_supabase().table("customers").select("id").limit(1).execute()
+        status["customers_acessivel"] = True
+    except Exception as exc:
+        status["erro"] = str(exc)
+    return status
+
+
+def _executar_supabase(operacao):
+    try:
+        return operacao()
+    except Exception as exc:
+        mensagem = str(exc)
+        status = 400 if "duplicate key" in mensagem.lower() else 500
+        raise HTTPException(status_code=status, detail=mensagem)
 
 
 def _now():
@@ -87,13 +117,15 @@ def criar_cookie(data):
         "stock": int(data.get("stock") or data.get("quantidade") or 0),
         "ingredients": data.get("ingredients") or [],
     }
-    result = get_supabase().table("cookies").insert(payload).execute()
+    result = _executar_supabase(
+        lambda: get_supabase().table("cookies").insert(payload).execute()
+    )
     return _cookie(result.data[0])
 
 
 def listar_cookies():
-    result = (
-        get_supabase()
+    result = _executar_supabase(
+        lambda: get_supabase()
         .table("cookies")
         .select("*")
         .order("created_at", desc=False)
@@ -157,13 +189,15 @@ def criar_cliente(data):
         "cpf": data.get("cpf", "").strip(),
         "contact": (data.get("contact") or data.get("telefone") or "").strip(),
     }
-    result = get_supabase().table("customers").insert(payload).execute()
+    result = _executar_supabase(
+        lambda: get_supabase().table("customers").insert(payload).execute()
+    )
     return _cliente(result.data[0])
 
 
 def listar_clientes():
-    result = (
-        get_supabase()
+    result = _executar_supabase(
+        lambda: get_supabase()
         .table("customers")
         .select("*")
         .order("created_at", desc=False)
@@ -226,15 +260,17 @@ def criar_venda(data):
         "notes": data.get("notes", "").strip(),
         "paid_at": _now() if status == "paid" else None,
     }
-    result = get_supabase().table("sales").insert(payload).execute()
+    result = _executar_supabase(
+        lambda: get_supabase().table("sales").insert(payload).execute()
+    )
     for item in items:
         ajustar_estoque(item["cookieId"], -int(item["quantity"]))
     return _venda(result.data[0])
 
 
 def listar_vendas():
-    result = (
-        get_supabase()
+    result = _executar_supabase(
+        lambda: get_supabase()
         .table("sales")
         .select("*")
         .order("created_at", desc=False)
