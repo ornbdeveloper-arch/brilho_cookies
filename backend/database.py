@@ -271,6 +271,9 @@ def criar_venda(data):
         "notes": data.get("notes", "").strip(),
         "paid_at": _now() if status == "paid" else None,
     }
+    created_at = data.get("createdAt") or data.get("created_at")
+    if created_at:
+        payload["created_at"] = created_at
     result = _executar_supabase(
         lambda: get_supabase().table("sales").insert(payload).execute()
     )

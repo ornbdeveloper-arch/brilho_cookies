@@ -17,7 +17,10 @@
           <h1>Vendas 🛍️</h1>
           <p class="subtitle">Toda venda nasce <strong>pendente</strong>. Marque como paga quando o dinheiro cair.</p>
         </div>
-        <button class="btn" id="btn-new">+ Registrar venda</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn secondary" id="btn-export">Baixar Excel</button>
+          <button class="btn" id="btn-new">+ Registrar venda</button>
+        </div>
       </div>
 
       <div class="filters">
@@ -43,9 +46,15 @@
   <script src="js/storage.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/layout.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script>
     renderLayout("vendas");
     const listEl = document.getElementById("sale-list");
+    let currentSales = [];
+    function toDatetimeLocal(date = new Date()) {
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
     const methodLabel = { pix: "Pix", dinheiro: "Dinheiro", cartao: "Cartão", fiado: "Fiado" };
 
     function render() {
@@ -57,6 +66,7 @@
         s.customerName.toLowerCase().includes(term) || (s.customerCpf || "").includes(term));
       if (status !== "all") sales = sales.filter((s) => s.paymentStatus === status);
       if (method !== "all") sales = sales.filter((s) => s.paymentMethod === method);
+      currentSales = sales;
 
       if (!sales.length) {
         listEl.innerHTML = `<div class="empty">
@@ -68,7 +78,7 @@
       }
 
       listEl.innerHTML = `<div class="table-wrap"><table>
-        <thead><tr><th>Data</th><th>Cliente</th><th>Itens</th><th>Total</th><th>Método</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Data</th><th>Cliente</th><th>Itens</th><th>Total</th><th>Método</th><th>Status</th><th>Obs.</th><th></th></tr></thead>
         <tbody>${sales.map((s) => `
           <tr>
             <td>${fmt.date(s.createdAt)}</td>
@@ -79,6 +89,7 @@
             <td>${s.paymentStatus === "paid"
               ? '<span class="badge success">Pago</span>'
               : '<span class="badge pending">Pendente</span>'}</td>
+            <td style="max-width:220px;color:var(--muted-foreground);">${s.notes || "—"}</td>
             <td style="text-align:right;white-space:nowrap;">
               <button class="btn ghost sm" data-view="${s.id}">👁️</button>
               ${s.paymentStatus === "paid"
@@ -117,6 +128,37 @@
       openModal({ title: "Detalhes da venda", body: html, confirmText: "Fechar", cancelText: "" });
     }
 
+    function exportSales() {
+      if (!window.XLSX) {
+        toast("Nao foi possivel carregar o exportador de Excel", "error");
+        return;
+      }
+      if (!currentSales.length) {
+        toast("Nenhuma venda para baixar com os filtros atuais", "info");
+        return;
+      }
+
+      const rows = currentSales.map((sale) => ({
+        Data: fmt.date(sale.createdAt),
+        Cliente: sale.customerName,
+        CPF: sale.customerCpf ? fmt.cpf(sale.customerCpf) : "",
+        Itens: sale.items.map((item) => `${item.quantity}x ${item.cookieName}`).join(", "),
+        "Qtd. total": sale.items.reduce((total, item) => total + Number(item.quantity || 0), 0),
+        Total: Number(sale.total || 0),
+        Metodo: methodLabel[sale.paymentMethod] || sale.paymentMethod,
+        Status: sale.paymentStatus === "paid" ? "Pago" : "Pendente",
+        Observacao: sale.notes || "",
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      worksheet["!cols"] = [
+        { wch: 18 }, { wch: 24 }, { wch: 16 }, { wch: 36 }, { wch: 10 },
+        { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 32 },
+      ];
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Vendas");
+      XLSX.writeFile(workbook, `vendas-brilho-cookies-${toDatetimeLocal().replace(/[:T]/g, "-")}.xlsx`);
+    }
+
     function openSaleForm() {
       const cookies = cookieStore.list().filter((c) => c.stock > 0);
       const customers = customerStore.list();
@@ -131,6 +173,10 @@
             <option value="">Selecione...</option>
             ${customers.map((c) => `<option value="${c.id}">${c.name}${c.cpf ? ` — ${fmt.cpf(c.cpf)}` : ""}</option>`).join("")}
           </select>
+        </div>
+        <div class="field">
+          <label>Data da venda *</label>
+          <input id="f-date" type="datetime-local" value="${toDatetimeLocal()}" />
         </div>
         <div class="field">
           <label>Cookies *</label>
@@ -200,10 +246,13 @@
             if (Number(it.quantity) > c.stock) { toast(`Estoque insuficiente para ${c.name}`, "error"); return false; }
           }
           const method = form.querySelector("#f-method").value;
+          const saleDate = form.querySelector("#f-date").value;
+          if (!saleDate) { toast("Informe a data da venda", "error"); return false; }
           await saleStore.create({
             customerId: customer.id,
             customerName: customer.name,
             customerCpf: customer.cpf,
+            createdAt: new Date(saleDate).toISOString(),
             items: validItems.map((it) => {
               const c = cookies.find((x) => x.id === it.cookieId);
               return { cookieId: c.id, cookieName: c.name, quantity: Number(it.quantity), unitPrice: c.price };
@@ -219,6 +268,7 @@
     }
 
     document.getElementById("btn-new").onclick = openSaleForm;
+    document.getElementById("btn-export").onclick = exportSales;
     ["f-text", "f-status", "f-method"].forEach((id) => {
       document.getElementById(id).oninput = render;
       document.getElementById(id).onchange = render;
