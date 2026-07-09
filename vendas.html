@@ -55,6 +55,9 @@
       const pad = (n) => String(n).padStart(2, "0");
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
     }
+    function remainingOf(sale) {
+      return Math.max(0, Number(sale.remainingAmount ?? (sale.total - (sale.paidAmount || 0))));
+    }
     const methodLabel = { pix: "Pix", dinheiro: "Dinheiro", cartao: "Cartão", fiado: "Fiado" };
 
     function render() {
@@ -78,7 +81,7 @@
       }
 
       listEl.innerHTML = `<div class="table-wrap"><table>
-        <thead><tr><th>Data</th><th>Cliente</th><th>Itens</th><th>Total</th><th>Método</th><th>Status</th><th>Obs.</th><th></th></tr></thead>
+        <thead><tr><th>Data</th><th>Cliente</th><th>Itens</th><th>Total</th><th>Método</th><th>Status</th><th>Pago</th><th>Falta</th><th>Obs.</th><th></th></tr></thead>
         <tbody>${sales.map((s) => `
           <tr>
             <td>${fmt.date(s.createdAt)}</td>
@@ -89,6 +92,8 @@
             <td>${s.paymentStatus === "paid"
               ? '<span class="badge success">Pago</span>'
               : '<span class="badge pending">Pendente</span>'}</td>
+            <td>${fmt.brl(s.paidAmount || 0)}</td>
+            <td>${fmt.brl(remainingOf(s))}</td>
             <td style="max-width:220px;color:var(--muted-foreground);">${s.notes || "—"}</td>
             <td style="text-align:right;white-space:nowrap;">
               <button class="btn ghost sm" data-view="${s.id}">👁️</button>
@@ -100,7 +105,7 @@
           </tr>`).join("")}</tbody></table></div>`;
 
       listEl.querySelectorAll("[data-pay]").forEach((b) =>
-        b.onclick = async () => { await saleStore.markPaid(b.dataset.pay); toast("Venda marcada como paga! 💰", "success"); render(); });
+        b.onclick = () => openPaymentForm(saleStore.get(b.dataset.pay)));
       listEl.querySelectorAll("[data-unpay]").forEach((b) =>
         b.onclick = async () => { await saleStore.markPending(b.dataset.unpay); toast("Venda marcada como pendente", "info"); render(); });
       listEl.querySelectorAll("[data-view]").forEach((b) =>
@@ -117,6 +122,7 @@
         <p><strong>Cliente:</strong> ${s.customerName} (${fmt.cpf(s.customerCpf)})</p>
         <p><strong>Data:</strong> ${fmt.date(s.createdAt)}</p>
         <p><strong>Pagamento:</strong> ${methodLabel[s.paymentMethod]} — ${s.paymentStatus === "paid" ? "Pago" : "Pendente"}</p>
+        <p><strong>Pago:</strong> ${fmt.brl(s.paidAmount || 0)} | <strong>Falta:</strong> ${fmt.brl(remainingOf(s))}</p>
         ${s.notes ? `<p><strong>Obs:</strong> ${s.notes}</p>` : ""}
         <div class="table-wrap" style="margin-top:12px;"><table>
           <thead><tr><th>Cookie</th><th>Qtd</th><th>Unit.</th><th>Subtotal</th></tr></thead>
@@ -126,6 +132,37 @@
         </table></div>
         <p style="text-align:right;margin-top:12px;font-size:1.1rem;"><strong>Total: ${fmt.brl(s.total)}</strong></p>`;
       openModal({ title: "Detalhes da venda", body: html, confirmText: "Fechar", cancelText: "" });
+    }
+
+    function openPaymentForm(sale) {
+      const remaining = remainingOf(sale);
+      if (remaining <= 0) {
+        toast("Esta venda ja esta paga", "info");
+        return;
+      }
+      const form = document.createElement("div");
+      form.innerHTML = `
+        <p><strong>Cliente:</strong> ${sale.customerName}</p>
+        <p><strong>Total:</strong> ${fmt.brl(sale.total)} | <strong>Pago:</strong> ${fmt.brl(sale.paidAmount || 0)}</p>
+        <div class="field">
+          <label>Valor recebido agora *</label>
+          <input id="f-payment" type="number" min="0.01" step="0.01" max="${remaining}" value="${remaining.toFixed(2)}" />
+        </div>
+        <p class="hint">Falta receber ${fmt.brl(remaining)}. Se informar menos, a venda continua pendente.</p>`;
+
+      openModal({
+        title: "Registrar pagamento",
+        body: form,
+        confirmText: "Salvar pagamento",
+        onConfirm: async () => {
+          const amount = Number(form.querySelector("#f-payment").value);
+          if (!amount || amount <= 0) { toast("Informe um valor valido", "error"); return false; }
+          if (amount > remaining) { toast("Valor maior que o saldo restante", "error"); return false; }
+          const updated = await saleStore.registerPayment(sale.id, amount);
+          toast(updated.paymentStatus === "paid" ? "Venda quitada!" : "Pagamento parcial registrado", "success");
+          render();
+        },
+      });
     }
 
     function exportSales() {
@@ -145,6 +182,8 @@
         Itens: sale.items.map((item) => `${item.quantity}x ${item.cookieName}`).join(", "),
         "Qtd. total": sale.items.reduce((total, item) => total + Number(item.quantity || 0), 0),
         Total: Number(sale.total || 0),
+        "Valor pago": Number(sale.paidAmount || 0),
+        "Valor restante": remainingOf(sale),
         Metodo: methodLabel[sale.paymentMethod] || sale.paymentMethod,
         Status: sale.paymentStatus === "paid" ? "Pago" : "Pendente",
         Observacao: sale.notes || "",
@@ -152,7 +191,7 @@
       const worksheet = XLSX.utils.json_to_sheet(rows);
       worksheet["!cols"] = [
         { wch: 18 }, { wch: 24 }, { wch: 16 }, { wch: 36 }, { wch: 10 },
-        { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 32 },
+        { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 32 },
       ];
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Vendas");

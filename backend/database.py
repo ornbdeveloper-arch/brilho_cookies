@@ -99,6 +99,8 @@ def _cliente(row):
 
 
 def _venda(row):
+    total = float(row.get("total") or 0)
+    paid_amount = float(row.get("paid_amount") or 0)
     return {
         "id": row["id"],
         "customerId": row.get("customer_id"),
@@ -106,8 +108,10 @@ def _venda(row):
         "cliente": row.get("customer_name") or "",
         "customerCpf": row.get("customer_cpf") or "",
         "items": row.get("items") or [],
-        "total": float(row.get("total") or 0),
-        "valor": float(row.get("total") or 0),
+        "total": total,
+        "valor": total,
+        "paidAmount": paid_amount,
+        "remainingAmount": max(0, total - paid_amount),
         "paymentMethod": row.get("payment_method") or "",
         "paymentStatus": row.get("payment_status") or "pending",
         "pago": row.get("payment_status") == "paid",
@@ -259,12 +263,20 @@ def criar_venda(data):
     status = data.get("paymentStatus") or data.get("payment_status") or "pending"
     if "pago" in data:
         status = "paid" if data.get("pago") else "pending"
+    paid_amount = float(data.get("paidAmount") or data.get("paid_amount") or 0)
+    if status == "paid" and paid_amount <= 0:
+        paid_amount = total
+    if paid_amount >= total and total > 0:
+        status = "paid"
+    else:
+        status = "pending"
     payload = {
         "customer_id": data.get("customerId"),
         "customer_name": (data.get("customerName") or data.get("cliente") or "").strip(),
         "customer_cpf": (data.get("customerCpf") or "").strip() or None,
         "items": items,
         "total": total,
+        "paid_amount": min(paid_amount, total),
         "payment_method": data.get("paymentMethod", "pix"),
         "payment_status": status,
         "pay_later": bool(data.get("payLater")),
@@ -306,7 +318,33 @@ def obter_venda(venda_id):
 
 
 def marcar_venda(venda_id, status):
+    venda = obter_venda(venda_id)
+    if not venda:
+        return None
+    paid_amount = venda["total"] if status == "paid" else 0
     payload = {
+        "payment_status": status,
+        "paid_amount": paid_amount,
+        "paid_at": _now() if status == "paid" else None,
+    }
+    result = (
+        get_supabase()
+        .table("sales")
+        .update(payload)
+        .eq("id", venda_id)
+        .execute()
+    )
+    return _venda(result.data[0]) if result.data else None
+
+
+def registrar_pagamento(venda_id, valor):
+    venda = obter_venda(venda_id)
+    if not venda:
+        return None
+    novo_pago = min(venda["total"], venda["paidAmount"] + float(valor or 0))
+    status = "paid" if novo_pago >= venda["total"] else "pending"
+    payload = {
+        "paid_amount": novo_pago,
         "payment_status": status,
         "paid_at": _now() if status == "paid" else None,
     }

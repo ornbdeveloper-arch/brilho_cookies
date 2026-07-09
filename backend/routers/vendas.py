@@ -5,6 +5,7 @@ from backend.database import (
     listar_vendas,
     marcar_venda,
     obter_venda,
+    registrar_pagamento,
     remover_venda,
 )
 
@@ -32,6 +33,17 @@ def get_venda(venda_id: str):
 @router.patch("/{venda_id}/pagar")
 def pagar_venda(venda_id: str):
     venda = marcar_venda(venda_id, "paid")
+    if not venda:
+        raise HTTPException(status_code=404, detail="Venda nao encontrada")
+    return venda
+
+
+@router.patch("/{venda_id}/pagamento")
+def pagamento_parcial(venda_id: str, pagamento: dict):
+    valor = pagamento.get("valor") or pagamento.get("amount")
+    if not valor or float(valor) <= 0:
+        raise HTTPException(status_code=400, detail="Informe um valor de pagamento maior que zero")
+    venda = registrar_pagamento(venda_id, valor)
     if not venda:
         raise HTTPException(status_code=404, detail="Venda nao encontrada")
     return venda

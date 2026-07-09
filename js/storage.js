@@ -117,6 +117,13 @@ const saleStore = {
     const sale = await request(`/vendas/${id}/pagar`, { method: "PATCH" });
     return replaceById(state.sales, sale);
   },
+  registerPayment: async (id, amount) => {
+    const sale = await request(`/vendas/${id}/pagamento`, {
+      method: "PATCH",
+      body: JSON.stringify({ valor: amount }),
+    });
+    return replaceById(state.sales, sale);
+  },
   markPending: async (id) => {
     const sale = await request(`/vendas/${id}/pendente`, { method: "PATCH" });
     return replaceById(state.sales, sale);

@@ -25,6 +25,7 @@ create table if not exists public.sales (
   customer_cpf text,
   items jsonb not null default '[]'::jsonb,
   total numeric(10, 2) not null default 0,
+  paid_amount numeric(10, 2) not null default 0,
   payment_method text not null default 'pix',
   payment_status text not null default 'pending',
   pay_later boolean not null default false,
@@ -39,6 +40,8 @@ alter table public.sales enable row level security;
 
 alter table public.customers alter column cpf drop not null;
 alter table public.sales alter column customer_cpf drop not null;
+alter table public.sales add column if not exists paid_amount numeric(10, 2) not null default 0;
+update public.sales set paid_amount = total where payment_status = 'paid' and paid_amount = 0;
 
 drop policy if exists "Backend can manage cookies" on public.cookies;
 drop policy if exists "Backend can manage customers" on public.customers;
