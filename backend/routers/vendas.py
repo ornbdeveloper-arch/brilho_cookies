@@ -1,6 +1,12 @@
 from fastapi import APIRouter, HTTPException
 
-from database import criar_venda, listar_vendas, marcar_venda, obter_venda, remover_venda
+from backend.database import (
+    criar_venda,
+    listar_vendas,
+    marcar_venda,
+    obter_venda,
+    remover_venda,
+)
 
 router = APIRouter()
 

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from database import (
+from backend.database import (
     atualizar_cookie,
     criar_cookie,
     listar_cookies,

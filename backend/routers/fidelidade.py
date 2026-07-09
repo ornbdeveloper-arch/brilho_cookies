@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from database import listar_vendas
+from backend.database import listar_vendas
 
 router = APIRouter()
 

@@ -54,6 +54,29 @@ uvicorn main:app --reload
 
 A API fica em `http://localhost:8000`.
 
+## Deploy no Render
+
+O arquivo `runtime.txt` fixa o Python em `3.12.7` para evitar builds com Python muito novo, como `3.14`, que podem tentar compilar dependencias nativas.
+
+Configure o serviço como Web Service:
+
+```bash
+pip install -r requirements.txt
+```
+
+Start command:
+
+```bash
+uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+```
+
+No painel do Render, adicione:
+
+```env
+SUPABASE_URL=https://seu-projeto.supabase.co
+SUPABASE_KEY=sua-chave-do-supabase
+```
+
 ## Abrir o frontend
 
 Na raiz do projeto, abra o `index.html` no navegador ou sirva a pasta:

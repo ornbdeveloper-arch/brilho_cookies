@@ -12,8 +12,8 @@ load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 def get_supabase() -> Client:
     global _client
     if _client is None:
-        url = os.getenv("https://lysvkyvfylsqmbrxrphq.supabase.co/rest/v1/")
-        key = os.getenv("sb_publishable_lJg0UaJE1OV2RmNQ1zc54Q_KBmsceLY")
+        url = os.getenv("")
+        key = os.getenv("")
         if not url or not key:
             raise RuntimeError(
                 "Configure as variaveis de ambiente SUPABASE_URL e SUPABASE_KEY."
