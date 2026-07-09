@@ -65,7 +65,7 @@
       listEl.querySelectorAll("[data-del]").forEach((b) =>
         b.onclick = async () => {
           const ok = await confirmModal({ title: "Excluir cookie?", message: "Esta ação não pode ser desfeita." });
-          if (ok) { cookieStore.remove(b.dataset.del); toast("Cookie removido", "success"); render(); }
+          if (ok) { await cookieStore.remove(b.dataset.del); toast("Cookie removido", "success"); render(); }
         });
     }
 
@@ -144,7 +144,7 @@
         subtitle: "Preencha os detalhes do seu cookie. Ingredientes são opcionais.",
         body: form,
         confirmText: isEdit ? "Salvar" : "Cadastrar",
-        onConfirm: () => {
+        onConfirm: async () => {
           const payload = {
             name: form.querySelector("#f-name").value.trim(),
             flavor: form.querySelector("#f-flavor").value.trim(),
@@ -153,8 +153,8 @@
             ingredients: ingsState.filter((i) => i.name && i.name.trim()),
           };
           if (!payload.name) { toast("O nome é obrigatório", "error"); return false; }
-          if (isEdit) { cookieStore.update(cookie.id, payload); toast("Cookie atualizado!", "success"); }
-          else { cookieStore.create(payload); toast("Cookie cadastrado!", "success"); }
+          if (isEdit) { await cookieStore.update(cookie.id, payload); toast("Cookie atualizado!", "success"); }
+          else { await cookieStore.create(payload); toast("Cookie cadastrado!", "success"); }
           render();
         },
       });
@@ -163,7 +163,7 @@
     document.getElementById("btn-new").onclick = () => openCookieForm(null);
     document.getElementById("filter-name").oninput = render;
     document.getElementById("filter-stock").onchange = render;
-    render();
+    brilhoStore.ready.then(render).catch(() => toast("Nao foi possivel carregar os cookies", "error"));
   </script>
 </body>
 </html>

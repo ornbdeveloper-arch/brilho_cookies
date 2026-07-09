@@ -43,6 +43,7 @@
   <script>
     renderLayout("dashboard");
 
+    brilhoStore.ready.then(() => {
     const cookies = cookieStore.list();
     const customers = customerStore.list();
     const sales = saleStore.list();
@@ -96,6 +97,7 @@
           <span class="badge ${c.stock === 0 ? "danger" : "pending"}">${c.stock} un.</span>
         </div>`).join("");
     }
+    }).catch(() => toast("Nao foi possivel carregar o dashboard", "error"));
   </script>
 </body>
 </html>

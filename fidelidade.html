@@ -30,6 +30,7 @@
   <script>
     renderLayout("fidelidade");
 
+    brilhoStore.ready.then(() => {
     /** Calcula tier por valor total comprado.
      * Bronze: < R$ 100 | Prata: R$ 100–299 | Ouro: ≥ R$ 300 */
     function tierOf(total) {
@@ -84,6 +85,7 @@
           </tr>`).join("")}
         </tbody></table></div>`;
     }
+    }).catch(() => toast("Nao foi possivel carregar o ranking", "error"));
   </script>
 </body>
 </html>

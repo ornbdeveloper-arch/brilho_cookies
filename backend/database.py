@@ -1,102 +1,278 @@
-import sqlite3
+import os
+from datetime import datetime, timezone
 
-# 🔗 Conexão única
-conn = sqlite3.connect("banco.db", check_same_thread=False)
-cursor = conn.cursor()
+from dotenv import load_dotenv
+from supabase import Client, create_client
 
 
-# 🚀 Criar tabelas
+_client: Client | None = None
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
+
+def get_supabase() -> Client:
+    global _client
+    if _client is None:
+        url = os.getenv("https://lysvkyvfylsqmbrxrphq.supabase.co/rest/v1/")
+        key = os.getenv("sb_publishable_lJg0UaJE1OV2RmNQ1zc54Q_KBmsceLY")
+        if not url or not key:
+            raise RuntimeError(
+                "Configure as variaveis de ambiente SUPABASE_URL e SUPABASE_KEY."
+            )
+        _client = create_client(url, key)
+    return _client
+
+
 def criar_tabelas():
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS clientes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT,
-        telefone TEXT
-    )
-    """)
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS cookies (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT,
-        preco REAL,
-        quantidade INTEGER
-    )
-    """)
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS vendas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        cliente TEXT,
-        valor REAL,
-        pago BOOLEAN
-    )
-    """)
-
-    conn.commit()
+    # As tabelas ficam descritas em backend/schema.sql.
+    # O Supabase nao permite criar schema pela API REST usada pela aplicacao.
+    get_supabase()
 
 
-# =========================
-# 👤 CLIENTES
-# =========================
-
-def criar_cliente(nome, telefone):
-    cursor.execute(
-        "INSERT INTO clientes (nome, telefone) VALUES (?, ?)",
-        (nome, telefone)
-    )
-    conn.commit()
+def _now():
+    return datetime.now(timezone.utc).isoformat()
 
 
-def listar_clientes():
-    cursor.execute("SELECT * FROM clientes")
-    dados = cursor.fetchall()
+def _cookie(row):
+    return {
+        "id": row["id"],
+        "name": row.get("name") or "",
+        "nome": row.get("name") or "",
+        "flavor": row.get("flavor") or "",
+        "price": float(row.get("price") or 0),
+        "preco": float(row.get("price") or 0),
+        "stock": int(row.get("stock") or 0),
+        "quantidade": int(row.get("stock") or 0),
+        "ingredients": row.get("ingredients") or [],
+        "createdAt": row.get("created_at"),
+    }
 
-    return [
-        {"id": c[0], "nome": c[1], "telefone": c[2]}
-        for c in dados
-    ]
+
+def _cliente(row):
+    return {
+        "id": row["id"],
+        "name": row.get("name") or "",
+        "nome": row.get("name") or "",
+        "cpf": row.get("cpf") or "",
+        "contact": row.get("contact") or "",
+        "telefone": row.get("contact") or "",
+        "createdAt": row.get("created_at"),
+    }
 
 
-# =========================
-# 🍪 COOKIES
-# =========================
+def _venda(row):
+    return {
+        "id": row["id"],
+        "customerId": row.get("customer_id"),
+        "customerName": row.get("customer_name") or "",
+        "cliente": row.get("customer_name") or "",
+        "customerCpf": row.get("customer_cpf") or "",
+        "items": row.get("items") or [],
+        "total": float(row.get("total") or 0),
+        "valor": float(row.get("total") or 0),
+        "paymentMethod": row.get("payment_method") or "",
+        "paymentStatus": row.get("payment_status") or "pending",
+        "pago": row.get("payment_status") == "paid",
+        "payLater": bool(row.get("pay_later")),
+        "notes": row.get("notes") or "",
+        "createdAt": row.get("created_at"),
+        "paidAt": row.get("paid_at"),
+    }
 
-def criar_cookie(nome, preco, quantidade):
-    cursor.execute(
-        "INSERT INTO cookies (nome, preco, quantidade) VALUES (?, ?, ?)",
-        (nome, preco, quantidade)
-    )
-    conn.commit()
+
+def criar_cookie(data):
+    payload = {
+        "name": (data.get("name") or data.get("nome") or "").strip(),
+        "flavor": data.get("flavor", "").strip(),
+        "price": float(data.get("price") or data.get("preco") or 0),
+        "stock": int(data.get("stock") or data.get("quantidade") or 0),
+        "ingredients": data.get("ingredients") or [],
+    }
+    result = get_supabase().table("cookies").insert(payload).execute()
+    return _cookie(result.data[0])
 
 
 def listar_cookies():
-    cursor.execute("SELECT * FROM cookies")
-    dados = cursor.fetchall()
-
-    return [
-        {"id": c[0], "nome": c[1], "preco": c[2], "quantidade": c[3]}
-        for c in dados
-    ]
-
-
-# =========================
-# 💰 VENDAS
-# =========================
-
-def criar_venda(cliente, valor, pago=True):
-    cursor.execute(
-        "INSERT INTO vendas (cliente, valor, pago) VALUES (?, ?, ?)",
-        (cliente, valor, pago)
+    result = (
+        get_supabase()
+        .table("cookies")
+        .select("*")
+        .order("created_at", desc=False)
+        .execute()
     )
-    conn.commit()
+    return [_cookie(row) for row in result.data]
+
+
+def obter_cookie(cookie_id):
+    result = (
+        get_supabase()
+        .table("cookies")
+        .select("*")
+        .eq("id", cookie_id)
+        .limit(1)
+        .execute()
+    )
+    return _cookie(result.data[0]) if result.data else None
+
+
+def atualizar_cookie(cookie_id, data):
+    payload = {
+        "name": (data.get("name") or data.get("nome") or "").strip(),
+        "flavor": data.get("flavor", "").strip(),
+        "price": float(data.get("price") or data.get("preco") or 0),
+        "stock": int(data.get("stock") or data.get("quantidade") or 0),
+        "ingredients": data.get("ingredients") or [],
+    }
+    result = (
+        get_supabase()
+        .table("cookies")
+        .update(payload)
+        .eq("id", cookie_id)
+        .execute()
+    )
+    return _cookie(result.data[0]) if result.data else None
+
+
+def ajustar_estoque(cookie_id, delta):
+    cookie = obter_cookie(cookie_id)
+    if not cookie:
+        return None
+    novo_estoque = max(0, int(cookie["stock"]) + int(delta))
+    result = (
+        get_supabase()
+        .table("cookies")
+        .update({"stock": novo_estoque})
+        .eq("id", cookie_id)
+        .execute()
+    )
+    return _cookie(result.data[0]) if result.data else None
+
+
+def remover_cookie(cookie_id):
+    get_supabase().table("cookies").delete().eq("id", cookie_id).execute()
+
+
+def criar_cliente(data):
+    payload = {
+        "name": (data.get("name") or data.get("nome") or "").strip(),
+        "cpf": data.get("cpf", "").strip(),
+        "contact": (data.get("contact") or data.get("telefone") or "").strip(),
+    }
+    result = get_supabase().table("customers").insert(payload).execute()
+    return _cliente(result.data[0])
+
+
+def listar_clientes():
+    result = (
+        get_supabase()
+        .table("customers")
+        .select("*")
+        .order("created_at", desc=False)
+        .execute()
+    )
+    return [_cliente(row) for row in result.data]
+
+
+def obter_cliente(cliente_id):
+    result = (
+        get_supabase()
+        .table("customers")
+        .select("*")
+        .eq("id", cliente_id)
+        .limit(1)
+        .execute()
+    )
+    return _cliente(result.data[0]) if result.data else None
+
+
+def atualizar_cliente(cliente_id, data):
+    payload = {
+        "name": (data.get("name") or data.get("nome") or "").strip(),
+        "cpf": data.get("cpf", "").strip(),
+        "contact": (data.get("contact") or data.get("telefone") or "").strip(),
+    }
+    result = (
+        get_supabase()
+        .table("customers")
+        .update(payload)
+        .eq("id", cliente_id)
+        .execute()
+    )
+    return _cliente(result.data[0]) if result.data else None
+
+
+def remover_cliente(cliente_id):
+    get_supabase().table("customers").delete().eq("id", cliente_id).execute()
+
+
+def criar_venda(data):
+    items = data.get("items") or []
+    total = (
+        sum(float(item["unitPrice"]) * int(item["quantity"]) for item in items)
+        if items
+        else float(data.get("valor") or 0)
+    )
+    status = data.get("paymentStatus") or data.get("payment_status") or "pending"
+    if "pago" in data:
+        status = "paid" if data.get("pago") else "pending"
+    payload = {
+        "customer_id": data.get("customerId"),
+        "customer_name": (data.get("customerName") or data.get("cliente") or "").strip(),
+        "customer_cpf": data.get("customerCpf", "").strip(),
+        "items": items,
+        "total": total,
+        "payment_method": data.get("paymentMethod", "pix"),
+        "payment_status": status,
+        "pay_later": bool(data.get("payLater")),
+        "notes": data.get("notes", "").strip(),
+        "paid_at": _now() if status == "paid" else None,
+    }
+    result = get_supabase().table("sales").insert(payload).execute()
+    for item in items:
+        ajustar_estoque(item["cookieId"], -int(item["quantity"]))
+    return _venda(result.data[0])
 
 
 def listar_vendas():
-    cursor.execute("SELECT * FROM vendas")
-    dados = cursor.fetchall()
+    result = (
+        get_supabase()
+        .table("sales")
+        .select("*")
+        .order("created_at", desc=False)
+        .execute()
+    )
+    return [_venda(row) for row in result.data]
 
-    return [
-        {"id": v[0], "cliente": v[1], "valor": v[2], "pago": bool(v[3])}
-        for v in dados
-    ]
+
+def obter_venda(venda_id):
+    result = (
+        get_supabase()
+        .table("sales")
+        .select("*")
+        .eq("id", venda_id)
+        .limit(1)
+        .execute()
+    )
+    return _venda(result.data[0]) if result.data else None
+
+
+def marcar_venda(venda_id, status):
+    payload = {
+        "payment_status": status,
+        "paid_at": _now() if status == "paid" else None,
+    }
+    result = (
+        get_supabase()
+        .table("sales")
+        .update(payload)
+        .eq("id", venda_id)
+        .execute()
+    )
+    return _venda(result.data[0]) if result.data else None
+
+
+def remover_venda(venda_id):
+    venda = obter_venda(venda_id)
+    if venda:
+        for item in venda["items"]:
+            ajustar_estoque(item["cookieId"], int(item["quantity"]))
+    get_supabase().table("sales").delete().eq("id", venda_id).execute()

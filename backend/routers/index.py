@@ -9,8 +9,8 @@ def dashboard():
     clientes = listar_clientes()
     cookies = listar_cookies()
 
-    receita_total = sum(v["valor"] for v in vendas) if vendas else 0
-    a_receber = sum(v["valor"] for v in vendas if not v.get("pago", True)) if vendas else 0
+    receita_total = sum(v["total"] for v in vendas if v["paymentStatus"] == "paid")
+    a_receber = sum(v["total"] for v in vendas if v["paymentStatus"] == "pending")
 
     return {
         "tipos_cookie": len(cookies),
@@ -19,5 +19,5 @@ def dashboard():
         "a_receber": a_receber,
         "total_vendas": len(vendas),
         "ultimas_vendas": vendas[-5:],
-        "estoque_baixo": [c for c in cookies if c["quantidade"] < 10]
+        "estoque_baixo": [c for c in cookies if c["stock"] < 10]
     }

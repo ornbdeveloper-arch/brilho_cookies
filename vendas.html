@@ -89,15 +89,15 @@
           </tr>`).join("")}</tbody></table></div>`;
 
       listEl.querySelectorAll("[data-pay]").forEach((b) =>
-        b.onclick = () => { saleStore.markPaid(b.dataset.pay); toast("Venda marcada como paga! 💰", "success"); render(); });
+        b.onclick = async () => { await saleStore.markPaid(b.dataset.pay); toast("Venda marcada como paga! 💰", "success"); render(); });
       listEl.querySelectorAll("[data-unpay]").forEach((b) =>
-        b.onclick = () => { saleStore.markPending(b.dataset.unpay); toast("Venda marcada como pendente", "info"); render(); });
+        b.onclick = async () => { await saleStore.markPending(b.dataset.unpay); toast("Venda marcada como pendente", "info"); render(); });
       listEl.querySelectorAll("[data-view]").forEach((b) =>
         b.onclick = () => viewSale(saleStore.get(b.dataset.view)));
       listEl.querySelectorAll("[data-del]").forEach((b) =>
         b.onclick = async () => {
           const ok = await confirmModal({ title: "Excluir venda?", message: "O estoque dos cookies será devolvido." });
-          if (ok) { saleStore.remove(b.dataset.del); toast("Venda removida", "success"); render(); }
+          if (ok) { await saleStore.remove(b.dataset.del); toast("Venda removida", "success"); render(); }
         });
     }
 
@@ -188,7 +188,7 @@
         title: "Registrar venda",
         body: form,
         confirmText: "Registrar",
-        onConfirm: () => {
+        onConfirm: async () => {
           const customerId = form.querySelector("#f-customer").value;
           const customer = customerStore.get(customerId);
           if (!customer) { toast("Selecione um cliente", "error"); return false; }
@@ -200,7 +200,7 @@
             if (Number(it.quantity) > c.stock) { toast(`Estoque insuficiente para ${c.name}`, "error"); return false; }
           }
           const method = form.querySelector("#f-method").value;
-          saleStore.create({
+          await saleStore.create({
             customerId: customer.id,
             customerName: customer.name,
             customerCpf: customer.cpf,
@@ -223,7 +223,7 @@
       document.getElementById(id).oninput = render;
       document.getElementById(id).onchange = render;
     });
-    render();
+    brilhoStore.ready.then(render).catch(() => toast("Nao foi possivel carregar as vendas", "error"));
   </script>
 </body>
 </html>

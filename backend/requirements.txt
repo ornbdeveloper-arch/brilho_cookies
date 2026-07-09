@@ -1,4 +1,4 @@
-pydantic
 fastapi
 uvicorn
-sqlalchemy
+supabase
+python-dotenv

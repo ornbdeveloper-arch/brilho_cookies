@@ -65,9 +65,18 @@ function openModal({ title, subtitle, body, onConfirm, confirmText = "Salvar", c
 
   const close = () => backdrop.remove();
   backdrop.querySelector('[data-act="cancel"]').onclick = close;
-  backdrop.querySelector('[data-act="confirm"]').onclick = () => {
-    const ok = onConfirm ? onConfirm(modalBody) : true;
-    if (ok !== false) close();
+  backdrop.querySelector('[data-act="confirm"]').onclick = async () => {
+    const button = backdrop.querySelector('[data-act="confirm"]');
+    button.disabled = true;
+    try {
+      const ok = onConfirm ? await onConfirm(modalBody) : true;
+      if (ok !== false) close();
+    } catch (error) {
+      console.error(error);
+      toast("Nao foi possivel salvar. Confira os dados e tente novamente.", "error");
+    } finally {
+      button.disabled = false;
+    }
   };
   backdrop.addEventListener("click", (e) => { if (e.target === backdrop) close(); });
   return { close, root: backdrop };

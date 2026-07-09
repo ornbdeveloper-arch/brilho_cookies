@@ -1,48 +1,103 @@
-# 🍪 Brilho Cookies
+# Brilho Cookies
 
-Aplicação local para gestão de venda de cookies, sem frameworks ou build.
+Aplicacao para gestao de cookies, clientes, vendas e fidelidade. O frontend continua em HTML/CSS/JS puro, e os dados agora ficam persistidos no Supabase via backend FastAPI.
 
-## Como rodar
+## Requisitos
 
-Abra o arquivo `index.html` diretamente no navegador (duplo clique) ou sirva
-a pasta com qualquer servidor estático:
+- Python 3.11 ou superior
+- Conta e projeto no Supabase
+
+## Criar as tabelas no Supabase
+
+1. Abra o painel do seu projeto no Supabase.
+2. Acesse `SQL Editor`.
+3. Cole e execute o conteudo de `backend/schema.sql`.
+
+Esse script cria as tabelas:
+
+- `cookies`
+- `customers`
+- `sales`
+
+## Configurar variaveis de ambiente
+
+Crie um arquivo `.env` dentro da pasta `backend`:
+
+```env
+SUPABASE_URL=https://seu-projeto.supabase.co
+SUPABASE_KEY=sua-chave-do-supabase
+```
+
+Use a `service_role key` quando o backend ficar apenas no servidor/local da loja. Nao coloque essa chave diretamente no frontend.
+
+## Instalar dependencias
 
 ```bash
-# opção 1 — Python
-python3 -m http.server 8080
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-# opção 2 — Node
-npx serve .
+No macOS/Linux, ative o ambiente com:
+
+```bash
+source .venv/bin/activate
+```
+
+## Rodar a API
+
+```bash
+cd backend
+uvicorn main:app --reload
+```
+
+A API fica em `http://localhost:8000`.
+
+## Abrir o frontend
+
+Na raiz do projeto, abra o `index.html` no navegador ou sirva a pasta:
+
+```bash
+python -m http.server 8080
 ```
 
 Acesse `http://localhost:8080`.
 
+Por padrao, o frontend chama `http://localhost:8000`. Se precisar usar outro endereco, defina antes de carregar `js/storage.js`:
+
+```html
+<script>
+  window.BRILHO_API_URL = "http://localhost:8001";
+</script>
+```
+
+## Endpoints principais
+
+- `GET /` - resumo do dashboard
+- `GET /cookies/`, `POST /cookies/`, `PUT /cookies/{id}`, `DELETE /cookies/{id}`
+- `GET /clientes/`, `POST /clientes/`, `PUT /clientes/{id}`, `DELETE /clientes/{id}`
+- `GET /vendas/`, `POST /vendas/`, `PATCH /vendas/{id}/pagar`, `PATCH /vendas/{id}/pendente`, `DELETE /vendas/{id}`
+- `GET /fidelidade/` - ranking de fidelidade
+
 ## Estrutura
 
+```text
+brilho_cookies/
+├── index.html
+├── cookies.html
+├── clientes.html
+├── vendas.html
+├── fidelidade.html
+├── css/
+├── js/
+│   ├── storage.js
+│   ├── ui.js
+│   └── layout.js
+└── backend/
+    ├── main.py
+    ├── database.py
+    ├── schema.sql
+    ├── requirements.txt
+    └── routers/
 ```
-raffa/
-├── index.html       # Dashboard
-├── cookies.html     # Cadastro e estoque de cookies
-├── clientes.html    # Cadastro de clientes (CPF, contato)
-├── vendas.html      # Registrar vendas, marcar pagamentos
-├── fidelidade.html  # Ranking de CPFs por total gasto
-├── css/styles.css   # Design system (tons pastéis + marrom)
-└── js/
-    ├── storage.js   # Camada de persistência (localStorage)
-    ├── ui.js        # Helpers: modal, toast, máscara CPF, formatos
-    └── layout.js    # Sidebar compartilhada
-```
-
-## Funcionalidades
-
-- ✅ Cadastro de cookies com ingredientes, preço e estoque
-- ✅ Cadastro de clientes (CPF único, nome, contato)
-- ✅ Registro de vendas — toda venda nasce **pendente**
-- ✅ Baixa automática de estoque ao registrar venda
-- ✅ Métodos de pagamento: Pix, Dinheiro, Cartão, Fiado
-- ✅ Marcar venda como paga quando o dinheiro cair
-- ✅ Filtros por status, método, cliente, CPF
-- ✅ Ranking de fidelidade por CPF (Bronze / Prata / Ouro)
-- ✅ Dashboard com receita paga, valor a receber e estoque baixo
-
-Todos os dados ficam no `localStorage` do navegador — 100% local, sem servidor.

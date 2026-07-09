@@ -74,7 +74,7 @@
       listEl.querySelectorAll("[data-del]").forEach((b) =>
         b.onclick = async () => {
           const ok = await confirmModal({ title: "Excluir cliente?", message: "As vendas associadas continuarão registradas." });
-          if (ok) { customerStore.remove(b.dataset.del); toast("Cliente removido", "success"); render(); }
+          if (ok) { await customerStore.remove(b.dataset.del); toast("Cliente removido", "success"); render(); }
         });
     }
 
@@ -95,7 +95,7 @@
         subtitle: "O CPF é usado como chave única para o ranking de fidelidade.",
         body: form,
         confirmText: isEdit ? "Salvar" : "Cadastrar",
-        onConfirm: () => {
+        onConfirm: async () => {
           const name = form.querySelector("#f-name").value.trim();
           const cpf = form.querySelector("#f-cpf").value.trim();
           const contact = form.querySelector("#f-contact").value.trim();
@@ -103,8 +103,8 @@
           if (cpf.replace(/\D/g, "").length !== 11) { toast("CPF inválido", "error"); return false; }
           const exists = customerStore.getByCpf(cpf);
           if (exists && (!isEdit || exists.id !== customer.id)) { toast("CPF já cadastrado", "error"); return false; }
-          if (isEdit) customerStore.update(customer.id, { name, cpf, contact });
-          else customerStore.create({ name, cpf, contact });
+          if (isEdit) await customerStore.update(customer.id, { name, cpf, contact });
+          else await customerStore.create({ name, cpf, contact });
           toast(isEdit ? "Cliente atualizado!" : "Cliente cadastrado!", "success");
           render();
         },
@@ -113,7 +113,7 @@
 
     document.getElementById("btn-new").onclick = () => openForm(null);
     document.getElementById("filter-text").oninput = render;
-    render();
+    brilhoStore.ready.then(render).catch(() => toast("Nao foi possivel carregar os clientes", "error"));
   </script>
 </body>
 </html>

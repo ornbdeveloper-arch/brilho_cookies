@@ -1,153 +1,121 @@
-/* 🍪 Brilho Cookies — Camada de persistência em localStorage
-   Mantém cookies, clientes e vendas. Tudo síncrono e local. */
+/* Brilho Cookies - camada de persistencia via API/Supabase.
+   As telas continuam usando cookieStore, customerStore e saleStore. */
 
-const KEYS = {
-  cookies: "cookiejar:cookies",
-  customers: "cookiejar:customers",
-  sales: "cookiejar:sales",
+const API_BASE = window.BRILHO_API_URL || "http://localhost:8000";
+
+const state = {
+  cookies: [],
+  customers: [],
+  sales: [],
 };
 
-/* ───── Helpers ───── */
-function read(key) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    console.error("Erro lendo", key, e);
-    return [];
+async function request(path, options = {}) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    ...options,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Erro na API: ${response.status}`);
   }
-}
-function write(key, data) {
-  localStorage.setItem(key, JSON.stringify(data));
-}
-function uid() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  if (response.status === 204) return null;
+  return response.json();
 }
 
-/* ───── Cookies ───── */
+async function loadAllData() {
+  const [cookies, customers, sales] = await Promise.all([
+    request("/cookies/"),
+    request("/clientes/"),
+    request("/vendas/"),
+  ]);
+  state.cookies = cookies;
+  state.customers = customers;
+  state.sales = sales;
+}
+
+function replaceById(list, item) {
+  const index = list.findIndex((entry) => entry.id === item.id);
+  if (index === -1) list.push(item);
+  else list[index] = item;
+  return item;
+}
+
+const brilhoStore = {
+  ready: loadAllData(),
+  reload: loadAllData,
+};
+
 const cookieStore = {
-  list: () => read(KEYS.cookies),
-  get: (id) => read(KEYS.cookies).find((c) => c.id === id),
-  create: (data) => {
-    const list = read(KEYS.cookies);
-    const cookie = {
-      id: uid(),
-      name: data.name,
-      flavor: data.flavor || "",
-      price: Number(data.price) || 0,
-      stock: Number(data.stock) || 0,
-      ingredients: data.ingredients || [],
-      createdAt: new Date().toISOString(),
-    };
-    list.push(cookie);
-    write(KEYS.cookies, list);
+  list: () => state.cookies,
+  get: (id) => state.cookies.find((c) => c.id === id),
+  create: async (data) => {
+    const cookie = await request("/cookies/", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    state.cookies.push(cookie);
     return cookie;
   },
-  update: (id, data) => {
-    const list = read(KEYS.cookies);
-    const idx = list.findIndex((c) => c.id === id);
-    if (idx === -1) return null;
-    list[idx] = { ...list[idx], ...data, price: Number(data.price), stock: Number(data.stock) };
-    write(KEYS.cookies, list);
-    return list[idx];
+  update: async (id, data) => {
+    const cookie = await request(`/cookies/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+    return replaceById(state.cookies, cookie);
   },
-  remove: (id) => {
-    write(KEYS.cookies, read(KEYS.cookies).filter((c) => c.id !== id));
-  },
-  /** Ajusta o estoque (delta pode ser negativo). */
-  adjustStock: (id, delta) => {
-    const list = read(KEYS.cookies);
-    const idx = list.findIndex((c) => c.id === id);
-    if (idx === -1) return;
-    list[idx].stock = Math.max(0, list[idx].stock + delta);
-    write(KEYS.cookies, list);
+  remove: async (id) => {
+    await request(`/cookies/${id}`, { method: "DELETE" });
+    state.cookies = state.cookies.filter((c) => c.id !== id);
   },
 };
 
-/* ───── Clientes ───── */
 const customerStore = {
-  list: () => read(KEYS.customers),
-  get: (id) => read(KEYS.customers).find((c) => c.id === id),
-  getByCpf: (cpf) => read(KEYS.customers).find((c) => c.cpf === cpf),
-  create: (data) => {
-    const list = read(KEYS.customers);
-    const customer = {
-      id: uid(),
-      name: data.name,
-      cpf: data.cpf,
-      contact: data.contact || "",
-      createdAt: new Date().toISOString(),
-    };
-    list.push(customer);
-    write(KEYS.customers, list);
+  list: () => state.customers,
+  get: (id) => state.customers.find((c) => c.id === id),
+  getByCpf: (cpf) => state.customers.find((c) => c.cpf === cpf),
+  create: async (data) => {
+    const customer = await request("/clientes/", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    state.customers.push(customer);
     return customer;
   },
-  update: (id, data) => {
-    const list = read(KEYS.customers);
-    const idx = list.findIndex((c) => c.id === id);
-    if (idx === -1) return null;
-    list[idx] = { ...list[idx], ...data };
-    write(KEYS.customers, list);
-    return list[idx];
+  update: async (id, data) => {
+    const customer = await request(`/clientes/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+    return replaceById(state.customers, customer);
   },
-  remove: (id) => {
-    write(KEYS.customers, read(KEYS.customers).filter((c) => c.id !== id));
+  remove: async (id) => {
+    await request(`/clientes/${id}`, { method: "DELETE" });
+    state.customers = state.customers.filter((c) => c.id !== id);
   },
 };
 
-/* ───── Vendas ───── */
 const saleStore = {
-  list: () => read(KEYS.sales),
-  get: (id) => read(KEYS.sales).find((s) => s.id === id),
-  /** Ao criar, baixa estoque automaticamente e marca pendente. */
-  create: (data) => {
-    const list = read(KEYS.sales);
-    const items = data.items.map((it) => ({
-      cookieId: it.cookieId,
-      cookieName: it.cookieName,
-      quantity: Number(it.quantity),
-      unitPrice: Number(it.unitPrice),
-    }));
-    const total = items.reduce((s, it) => s + it.quantity * it.unitPrice, 0);
-    const sale = {
-      id: uid(),
-      customerId: data.customerId,
-      customerName: data.customerName,
-      customerCpf: data.customerCpf,
-      items,
-      total,
-      paymentMethod: data.paymentMethod, // "pix" | "dinheiro" | "cartao" | "fiado"
-      paymentStatus: "pending",          // sempre nasce pendente
-      payLater: data.payLater || data.paymentMethod === "fiado",
-      notes: data.notes || "",
-      createdAt: new Date().toISOString(),
-      paidAt: null,
-    };
-    items.forEach((it) => cookieStore.adjustStock(it.cookieId, -it.quantity));
-    list.push(sale);
-    write(KEYS.sales, list);
+  list: () => state.sales,
+  get: (id) => state.sales.find((s) => s.id === id),
+  create: async (data) => {
+    const sale = await request("/vendas/", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    state.sales.push(sale);
+    await loadAllData();
     return sale;
   },
-  markPaid: (id) => {
-    const list = read(KEYS.sales);
-    const idx = list.findIndex((s) => s.id === id);
-    if (idx === -1) return;
-    list[idx].paymentStatus = "paid";
-    list[idx].paidAt = new Date().toISOString();
-    write(KEYS.sales, list);
+  markPaid: async (id) => {
+    const sale = await request(`/vendas/${id}/pagar`, { method: "PATCH" });
+    return replaceById(state.sales, sale);
   },
-  markPending: (id) => {
-    const list = read(KEYS.sales);
-    const idx = list.findIndex((s) => s.id === id);
-    if (idx === -1) return;
-    list[idx].paymentStatus = "pending";
-    list[idx].paidAt = null;
-    write(KEYS.sales, list);
+  markPending: async (id) => {
+    const sale = await request(`/vendas/${id}/pendente`, { method: "PATCH" });
+    return replaceById(state.sales, sale);
   },
-  remove: (id) => {
-    // devolve estoque
-    const sale = saleStore.get(id);
-    if (sale) sale.items.forEach((it) => cookieStore.adjustStock(it.cookieId, it.quantity));
-    write(KEYS.sales, read(KEYS.sales).filter((s) => s.id !== id));
+  remove: async (id) => {
+    await request(`/vendas/${id}`, { method: "DELETE" });
+    await loadAllData();
   },
 };
