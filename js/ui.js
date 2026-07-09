@@ -112,7 +112,10 @@ function setupSidebar() {
   const toggle = document.querySelector(".menu-toggle");
   const sidebar = document.querySelector(".sidebar");
   if (toggle && sidebar) {
-    toggle.addEventListener("click", () => sidebar.classList.toggle("open"));
+    toggle.onclick = () => sidebar.classList.toggle("open");
+    document.querySelectorAll(".nav a").forEach((link) => {
+      link.onclick = () => sidebar.classList.remove("open");
+    });
   }
 }
 
