@@ -1,7 +1,7 @@
 /* Brilho Cookies - camada de persistencia via API/Supabase.
    As telas continuam usando cookieStore, customerStore e saleStore. */
 
-const API_BASE = window.BRILHO_API_URL || "http://localhost:8000";
+const API_BASE = window.BRILHO_API_URL || "https://brilho-cookies-1.onrender.com";
 
 const state = {
   cookies: [],
