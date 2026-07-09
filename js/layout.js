@@ -26,6 +26,7 @@ function renderLayout(activePage) {
         <a href="fidelidade.html"><span class="nav-icon">💖</span> Fidelidade</a>
       </nav>
     </aside>
+    <div class="sidebar-backdrop" aria-hidden="true"></div>
     <main class="main">
       <button class="btn ghost sm menu-toggle">☰ Menu</button>
       <div id="page">${mainHTML}</div>
