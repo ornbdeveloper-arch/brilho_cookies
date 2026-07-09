@@ -1,12 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.routers import clientes, cookies, fidelidade, index, vendas
-from backend.database import criar_tabelas
 
 app = FastAPI()
 
-
-criar_tabelas()
 
 app.add_middleware(
     CORSMiddleware,
